@@ -3,6 +3,7 @@
 #include <string.h>
 #include <stdlib.h>
 #include <unistd.h>
+#include <dirent.h>
 
 // NOTICE
 // if i comment obvious stuff is bc im new
@@ -22,7 +23,10 @@ void distro_OS()
         char read[256];
         while (fgets(read, sizeof(read), file) != NULL) {
             if (strncmp(read, "PRETTY_NAME=", 12) == 0) {
-                read[strlen(read) - 2] = '\0';
+                // removes "" before printing
+                read[strcspn(read, "\r\n")] = '\0';
+                memmove(read + 13, read + 13, strlen(read + 14) + 1);
+                read[strlen(read) - 1] = '\0';
                 printf("OS: %s\n", read + 13);
                 break;
             }
@@ -67,8 +71,10 @@ void cpu_name(char *buffer, size_t max_len)
                     // strip new char
                     name[strcspn(name, "\n")] = '\0';
 
-                    strncpy(buffer, name, max_len - 1);
-                    buffer[max_len - 1] = '\0';
+                    if (max_len != 0 && buffer != NULL) {
+                        strncpy(buffer, name, max_len - 1);
+                        buffer[max_len - 1] = '\0';
+                    }
 
                     break;
                 }
@@ -106,6 +112,52 @@ void print_cpu(void) {
     printf("CPU: %s (%ld threads) %.2f GHz\n",cpu_model, threads, clock);
 }
 
+double ram()
+{
+    FILE *file = fopen("/proc/meminfo", "r");
+    double ram = 0;
+
+    if (file == NULL) {
+        printf("ERROR: couldn't read filee");
+    } else {
+        char read[256];
+
+        while (fgets(read, sizeof(read), file) != NULL) {
+            if (strncmp(read, "MemTotal", 8) == 0) {
+                char *colon = strchr(read, ':');
+
+                if (colon) {
+                    char *max_mem = colon + 1;
+
+                    while(*max_mem == ' ' || *max_mem == '\t') { max_mem++; }
+                    max_mem[strcspn(max_mem, "\n")] = '\0';
+
+                    ram = strtod(max_mem, NULL) / 1024.0 / 1024.0;
+
+                    break;
+                }
+            }
+        }
+        fclose(file);
+    }
+    return ram;
+}
+
+void gpu_detect()
+{
+    FILE *file = popen("lspci | grep -E 'VGA|3D' | sed 's/.*: //'", "r");
+
+    if (file != NULL ) {
+        char gpu[256];
+        if (fgets(gpu, sizeof(gpu), file) != NULL) {
+            printf("GPU: %s", gpu);
+        }
+    pclose(file);
+    } else {
+        puts("ERROR: couldn't identify GPU");
+    }
+}
+
 void uptime()
 {
     FILE *file = fopen("/proc/uptime", "r");
@@ -128,11 +180,60 @@ void uptime()
     }
 }
 
+void logo() {
+    #ifdef __linux__
+        printf(
+            "             +%%@@@%%*=\n"
+            "           .%%@@@@@@#@%%-\n"
+            "           *@%%@@@@%%%%@@@.\n"
+            "           **==@#-+:#@@-\n"
+            "           *+#-+--%%-*@@-\n"
+            "           +#::..::-%%@@*\n"
+            "           +%%-====-:+@*@-\n"
+            "          -%%:.--:.   +@@@=\n"
+            "        :#@.          #@@@%%:\n"
+            "       -@@=         ..:#@@@@+\n"
+            "       %%@=              #%%%%@@=\n"
+            "      #@*               :@@%%@@.\n"
+            "     #@@.               .@@%%@@+\n"
+            "    :%%##.               :@%%@%%@=\n"
+            "   .:::=#+.            --@@@@*:\n"
+            ".-:-::::-#@#:         .-:+**=::.\n"
+            ".-::::::::*%%+        :*=::::::::::\n"
+            "--:::::::::-::.  .:=#@%%-:::::----:\n"
+            "--------:::=#%%#**#%%@@@#=---==-:\n"
+            "    ..:-==++:       .:-***+-\n"
+        );
+    #elif defined(_WIN32)
+    printf(
+        "################  ################\n"
+        "################  ################\n"
+        "################  ################\n"
+        "################  ################\n"
+        "################  ################\n"
+        "################  ################\n"
+        "################  ################\n"
+        "################  ################\n"
+        "\n"
+        "################  ################\n"
+        "################  ################\n"
+        "################  ################\n"
+        "################  ################\n"
+        "################  ################\n"
+        "################  ################\n"
+        "################  ################\n"
+        "################  ################\n"
+    );
+    #else
+        printf("unknown\n");
+    #endif
+}
+
 struct Hardware_linux {
     void (*motherboard)(void);
     void (*cpu)(void);
     void (*gpu)(void);
-    void (*ram)(void);
+    double(*ram)(void);
     void (*disk)(void);
 };
 
@@ -141,12 +242,13 @@ int main(void) {
     struct Hardware_linux hw = {
         .motherboard = motherboard,
         .cpu = print_cpu,
-        .gpu = NULL,
-        .ram = NULL,
+        .gpu = gpu_detect,
+        .ram = ram,
         .disk = NULL
     };
 
-
+    logo();
+    puts("-----------------------------------------------------------------");
     distro_OS();
 
     // kernel part was already done so no need to make extra function nor assign it to a struct
@@ -155,8 +257,8 @@ int main(void) {
 
     hw.motherboard();
     uptime();
-
     hw.cpu();
-
+    printf("ram: %.1fGiB\n", hw.ram());
+    hw.gpu();
     return 0;
 }
