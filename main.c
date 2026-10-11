@@ -4,6 +4,7 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <dirent.h>
+#include <sys/statvfs.h>
 
 // NOTICE
 // if i comment obvious stuff is bc im new
@@ -143,6 +144,21 @@ double ram()
     return ram;
 }
 
+void disk_space() {
+    struct statvfs ds;
+
+    if (statvfs("/", &ds) == 0) {
+        // f_frsize for accurate byte sizing on linux
+        unsigned long long total_space = ds.f_blocks * ds.f_frsize;
+        unsigned long long available_space = ds.f_bavail * ds.f_frsize;
+        unsigned long long used_space = total_space - available_space;
+
+        printf("DISK: %llu / %llu GiB", used_space / (1024ULL * 1024 * 1024), total_space / (1024ULL * 1024 * 1024));
+    } else {
+        puts("ERROR: couldn't determine disk space");
+    }
+}
+
 void gpu_detect()
 {
     FILE *file = popen("lspci | grep -E 'VGA|3D' | sed 's/.*: //'", "r");
@@ -244,7 +260,7 @@ int main(void) {
         .cpu = print_cpu,
         .gpu = gpu_detect,
         .ram = ram,
-        .disk = NULL
+        .disk = disk_space
     };
 
     logo();
@@ -254,11 +270,13 @@ int main(void) {
     // kernel part was already done so no need to make extra function nor assign it to a struct
     uname(&info);
     printf("OS Kernel: %s\n", info.sysname);
+    uptime();
 
     hw.motherboard();
-    uptime();
     hw.cpu();
     printf("ram: %.1fGiB\n", hw.ram());
     hw.gpu();
+    hw.disk();
+
     return 0;
 }
