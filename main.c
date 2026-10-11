@@ -26,7 +26,6 @@ void distro_OS()
             if (strncmp(read, "PRETTY_NAME=", 12) == 0) {
                 // removes "" before printing
                 read[strcspn(read, "\r\n")] = '\0';
-                memmove(read + 13, read + 13, strlen(read + 14) + 1);
                 read[strlen(read) - 1] = '\0';
                 printf("OS: %s\n", read + 13);
                 break;
@@ -153,7 +152,7 @@ void disk_space() {
         unsigned long long available_space = ds.f_bavail * ds.f_frsize;
         unsigned long long used_space = total_space - available_space;
 
-        printf("DISK: %llu / %llu GiB", used_space / (1024ULL * 1024 * 1024), total_space / (1024ULL * 1024 * 1024));
+        printf("DISK: %llu GiB / %llu GiB \n", used_space / (1024ULL * 1024 * 1024), total_space / (1024ULL * 1024 * 1024));
     } else {
         puts("ERROR: couldn't determine disk space");
     }
@@ -196,9 +195,9 @@ void uptime()
     }
 }
 
-void logo() {
+const char *logo(void) {
     #ifdef __linux__
-        printf(
+        return
             "             +%%@@@%%*=\n"
             "           .%%@@@@@@#@%%-\n"
             "           *@%%@@@@%%%%@@@.\n"
@@ -218,33 +217,33 @@ void logo() {
             ".-::::::::*%%+        :*=::::::::::\n"
             "--:::::::::-::.  .:=#@%%-:::::----:\n"
             "--------:::=#%%#**#%%@@@#=---==-:\n"
-            "    ..:-==++:       .:-***+-\n"
-        );
+            "    ..:-==++:       .:-***+-\n";
     #elif defined(_WIN32)
-    printf(
-        "################  ################\n"
-        "################  ################\n"
-        "################  ################\n"
-        "################  ################\n"
-        "################  ################\n"
-        "################  ################\n"
-        "################  ################\n"
-        "################  ################\n"
-        "\n"
-        "################  ################\n"
-        "################  ################\n"
-        "################  ################\n"
-        "################  ################\n"
-        "################  ################\n"
-        "################  ################\n"
-        "################  ################\n"
-        "################  ################\n"
-    );
+        return
+            "################  ################\n"
+            "################  ################\n"
+            "################  ################\n"
+            "################  ################\n"
+            "################  ################\n"
+            "################  ################\n"
+            "################  ################\n"
+            "################  ################\n"
+            "\n"
+            "################  ################\n"
+            "################  ################\n"
+            "################  ################\n"
+            "################  ################\n"
+            "################  ################\n"
+            "################  ################\n"
+            "################  ################\n"
+            "################  ################\n";
     #else
-        printf("unknown\n");
+        return "unknown\n";
     #endif
 }
 
+// more old code
+/*
 struct Hardware_linux {
     void (*motherboard)(void);
     void (*cpu)(void);
@@ -252,9 +251,13 @@ struct Hardware_linux {
     double(*ram)(void);
     void (*disk)(void);
 };
-
+*/
 int main(void) {
+    int start = 0;
+    const char *art = logo();
     struct utsname info;
+    // function assignment
+    /* more old code
     struct Hardware_linux hw = {
         .motherboard = motherboard,
         .cpu = print_cpu,
@@ -262,12 +265,73 @@ int main(void) {
         .ram = ram,
         .disk = disk_space
     };
+    */
 
-    logo();
-    puts("-----------------------------------------------------------------");
+    // old code design
+    // here if i want to redo anything so i can look and remenber what to do
+    // just to save time yk
+    /*
+    for (int i = 0; art[i] != '\0'; i++) {
+        if (art[i] == '\n') {
+            int length = i - start;
+            char n_line[length + 1];
+
+            memcpy(n_line, art + start, length);
+            n_line[length] = '\0';
+
+            printf("%s\n", n_line);
+
+            start = i + 1;
+        }
+    }
+    */
+
+    const char *info_lines[] = {
+        "OS: Ubuntu 26.04.1 LTS",
+        "OS Kernel: Linux",
+        "uptime: 46h, 35min, 13s",
+        "motherboard: X870E GAMING PLUS WIFI",
+        "CPU: AMD Ryzen 5 7600X",
+        "RAM: 29.7 GiB",
+        "GPU: RTX 2080 SUPER",
+        "DISK: 306 GiB / 770 GiB"
+    };
+
+    int info_count = sizeof(info_lines) / sizeof(info_lines[0]);
+    int row = 0;
+
+    for (int i = 0; art[i] != '\0'; i++) {
+        if (art[i] == '\n') {
+            // memcpy() copies bytes between memory locations.
+            // art + start points to where the current line begins.
+            // length tells it how many bytes to copy.
+            // n_line[length] = '\0' terminates the string.
+
+            int length = i - start;
+            char n_line[length + 1];
+
+            memcpy(n_line, art + start, length);
+            n_line[length] = '\0';
+
+            printf("%-38s", n_line);
+
+            if (row < info_count) {
+                printf("  %s", info_lines[row]);
+            }
+
+            printf("\n");
+
+            start = i + 1;
+            row++;
+        }
+    }
+
+    // this is old, its here just in case it's needed and
+    // it doesnt affect code performance nor anything like that
+    // so its just like here just in case everytthing breaks
+    /*
     distro_OS();
-
-    // kernel part was already done so no need to make extra function nor assign it to a struct
+    kernel part was already done so no need to make extra function nor assign it to a struct
     uname(&info);
     printf("OS Kernel: %s\n", info.sysname);
     uptime();
@@ -277,6 +341,7 @@ int main(void) {
     printf("ram: %.1fGiB\n", hw.ram());
     hw.gpu();
     hw.disk();
+    */
 
     return 0;
 }
