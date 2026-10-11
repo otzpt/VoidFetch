@@ -12,22 +12,23 @@
 // be able to read it in an easier way
 // and helps me debug
 
-void distro_OS()
+void distro_OS(char *out, size_t size)
 {
     FILE *file = fopen("/etc/os-release", "r");
 
     // handle failure to open the file
     if (file == NULL) {
-        printf("Error: couldn't read file\n");
+        snprintf(out, size, "Error: couldn't read file");
     } else {
         // read file, clean the "" and print it
         char read[256];
+        snprintf(out, size, "OS: unknown");
         while (fgets(read, sizeof(read), file) != NULL) {
             if (strncmp(read, "PRETTY_NAME=", 12) == 0) {
                 // removes "" before printing
                 read[strcspn(read, "\r\n")] = '\0';
                 read[strlen(read) - 1] = '\0';
-                printf("OS: %s\n", read + 13);
+                snprintf(out, size, "OS: %s", read + 13);
                 break;
             }
         }
@@ -35,16 +36,20 @@ void distro_OS()
     }
 }
 
-void motherboard()
+void motherboard(char *out, size_t size)
 {
     FILE *file_model = fopen("/sys/class/dmi/id/board_name", "r");
 
     if (file_model == NULL) {
-        printf("ERROR: couldn't read file\n");
+        snprintf(out, size, "ERROR: couldn't read file");
     } else {
         char read_model[256];
+        snprintf(out, size, "motherboard: unknown");
+
         while (fgets(read_model, sizeof(read_model), file_model) != NULL) {
-            printf("motherboard: %s", read_model);
+            // removes new chjar, else it breaks the logo align
+            read_model[strcspn(read_model, "\n")] = '\0';
+            snprintf(out, size, "motherboard: %s", read_model);
             break;
         }
         fclose(file_model);
@@ -102,14 +107,14 @@ double cpu_clock()
     return max_clock;
 }
 
-void print_cpu(void) {
+void print_cpu(char *out, size_t size) {
     char cpu_model[256] = "Unknown CPU";
 
     cpu_name(cpu_model, sizeof(cpu_model));
     long threads = sysconf(_SC_NPROCESSORS_CONF);
     double clock = cpu_clock();
 
-    printf("CPU: %s (%ld threads) %.2f GHz\n",cpu_model, threads, clock);
+    snprintf(out, size, "CPU: %s (%ld threads) %.2f GHz",cpu_model, threads, clock);
 }
 
 double ram()
@@ -143,7 +148,7 @@ double ram()
     return ram;
 }
 
-void disk_space() {
+void disk_space(char *out, size_t size) {
     struct statvfs ds;
 
     if (statvfs("/", &ds) == 0) {
@@ -152,33 +157,37 @@ void disk_space() {
         unsigned long long available_space = ds.f_bavail * ds.f_frsize;
         unsigned long long used_space = total_space - available_space;
 
-        printf("DISK: %llu GiB / %llu GiB \n", used_space / (1024ULL * 1024 * 1024), total_space / (1024ULL * 1024 * 1024));
+        snprintf(out, size, "DISK: %llu GiB / %llu GiB", used_space / (1024ULL * 1024 * 1024), total_space / (1024ULL * 1024 * 1024));
     } else {
-        puts("ERROR: couldn't determine disk space");
+        snprintf(out, size, "ERROR: couldn't determine disk space");
     }
 }
 
-void gpu_detect()
+void gpu_detect(char *out, size_t size)
 {
     FILE *file = popen("lspci | grep -E 'VGA|3D' | sed 's/.*: //'", "r");
 
     if (file != NULL ) {
         char gpu[256];
+        snprintf(out, size, "GPU: unknown");
+
         if (fgets(gpu, sizeof(gpu), file) != NULL) {
-            printf("GPU: %s", gpu);
+            // strips new char from lspci
+            gpu[strcspn(gpu, "\n")] = '\0';
+            snprintf(out, size, "GPU: %s", gpu);
         }
     pclose(file);
     } else {
-        puts("ERROR: couldn't identify GPU");
+        snprintf(out, size, "ERROR: couldn't identify GPU");
     }
 }
 
-void uptime()
+void uptime(char *out, size_t size)
 {
     FILE *file = fopen("/proc/uptime", "r");
 
     if (file == NULL) {
-        printf("ERROR: couldn't read file\n");
+        snprintf(out, size, "ERROR: couldn't read file");
     } else {
         char read[50];
         if (fgets(read, sizeof(read), file) != NULL) {
@@ -189,7 +198,7 @@ void uptime()
             int minutes = (total_seconds % 3600) / 60;
             int remaining_seconds = total_seconds % 60;
 
-            printf("uptime: %dh, %dmin, %ds\n", hours, minutes, remaining_seconds);
+            snprintf(out, size, "uptime: %dh, %dmin, %ds", hours, minutes, remaining_seconds);
         }
         fclose(file);
     }
@@ -198,26 +207,22 @@ void uptime()
 const char *logo(void) {
     #ifdef __linux__
         return
-            "             +%%@@@%%*=\n"
-            "           .%%@@@@@@#@%%-\n"
-            "           *@%%@@@@%%%%@@@.\n"
-            "           **==@#-+:#@@-\n"
-            "           *+#-+--%%-*@@-\n"
-            "           +#::..::-%%@@*\n"
-            "           +%%-====-:+@*@-\n"
-            "          -%%:.--:.   +@@@=\n"
-            "        :#@.          #@@@%%:\n"
+            "             +%@@@%*=\n"
+            "           .%@@@@@@#@%-\n"
+            "           *@%@@@@%%@@@.\n"
+            "           *+#-+--%-*@@-\n"
+            "           +#::..::-%@@*\n"
+            "           +%-====-:+@*@-\n"
+            "        :#@.          #@@@%:\n"
             "       -@@=         ..:#@@@@+\n"
-            "       %%@=              #%%%%@@=\n"
-            "      #@*               :@@%%@@.\n"
-            "     #@@.               .@@%%@@+\n"
-            "    :%%##.               :@%%@%%@=\n"
+            "       %@=              #%%@@=\n"
+            "     #@@.               .@@%@@+\n"
+            "    :%##.               :@%@%@=\n"
             "   .:::=#+.            --@@@@*:\n"
-            ".-:-::::-#@#:         .-:+**=::.\n"
-            ".-::::::::*%%+        :*=::::::::::\n"
-            "--:::::::::-::.  .:=#@%%-:::::----:\n"
-            "--------:::=#%%#**#%%@@@#=---==-:\n"
+            ".-::::::::*%+        :*=::::::::::\n"
+            "--:::::::::-::.  .:=#@%-:::::----:\n"
             "    ..:-==++:       .:-***+-\n";
+
     #elif defined(_WIN32)
         return
             "################  ################\n"
@@ -242,23 +247,41 @@ const char *logo(void) {
     #endif
 }
 
+char *get_user(void)
+{
+    // this doesn't need a function but i need to move fast so yea
+    char *username = getenv("USER");
+
+    if (username == NULL) {
+        username = "UNKNOWN";
+    }
+
+    return username;
+}
+
 int main(void) {
     int start = 0;
     const char *art = logo();
     struct utsname info;
 
-    const char *info_lines[] = {
-        "OS: Ubuntu 26.04.1 LTS",
-        "OS Kernel: Linux",
-        "uptime: 46h, 35min, 13s",
-        "motherboard: X870E GAMING PLUS WIFI",
-        "CPU: AMD Ryzen 5 7600X",
-        "RAM: 29.7 GiB",
-        "GPU: RTX 2080 SUPER",
-        "DISK: 306 GiB / 770 GiB"
-    };
+    // fills info with kernel name, hostname etc
+    uname(&info);
 
-    int info_count = sizeof(info_lines) / sizeof(info_lines[0]);
+    // each row is one line of text, filled at runtime instead of hardcoded
+    char lines[10][256];
+    int info_count = 0;
+
+    snprintf(lines[info_count++], 256, "%s@%s", get_user(), info.nodename);
+    snprintf(lines[info_count++], 256, "---------------------------------------");
+    distro_OS(lines[info_count++], 256);
+    snprintf(lines[info_count++], 256, "OS Kernel: %s", info.sysname);
+    uptime(lines[info_count++], 256);
+    motherboard(lines[info_count++], 256);
+    print_cpu(lines[info_count++], 256);
+    snprintf(lines[info_count++], 256, "RAM: %.1f GiB", ram());
+    gpu_detect(lines[info_count++], 256);
+    disk_space(lines[info_count++], 256);
+
     int row = 0;
 
     for (int i = 0; art[i] != '\0'; i++) {
@@ -277,7 +300,7 @@ int main(void) {
             printf("%-38s", n_line);
 
             if (row < info_count) {
-                printf("  %s", info_lines[row]);
+                printf("  %s", lines[row]);
             }
 
             printf("\n");
