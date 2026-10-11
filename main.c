@@ -242,49 +242,10 @@ const char *logo(void) {
     #endif
 }
 
-// more old code
-/*
-struct Hardware_linux {
-    void (*motherboard)(void);
-    void (*cpu)(void);
-    void (*gpu)(void);
-    double(*ram)(void);
-    void (*disk)(void);
-};
-*/
 int main(void) {
     int start = 0;
     const char *art = logo();
     struct utsname info;
-    // function assignment
-    /* more old code
-    struct Hardware_linux hw = {
-        .motherboard = motherboard,
-        .cpu = print_cpu,
-        .gpu = gpu_detect,
-        .ram = ram,
-        .disk = disk_space
-    };
-    */
-
-    // old code design
-    // here if i want to redo anything so i can look and remenber what to do
-    // just to save time yk
-    /*
-    for (int i = 0; art[i] != '\0'; i++) {
-        if (art[i] == '\n') {
-            int length = i - start;
-            char n_line[length + 1];
-
-            memcpy(n_line, art + start, length);
-            n_line[length] = '\0';
-
-            printf("%s\n", n_line);
-
-            start = i + 1;
-        }
-    }
-    */
 
     const char *info_lines[] = {
         "OS: Ubuntu 26.04.1 LTS",
@@ -325,23 +286,6 @@ int main(void) {
             row++;
         }
     }
-
-    // this is old, its here just in case it's needed and
-    // it doesnt affect code performance nor anything like that
-    // so its just like here just in case everytthing breaks
-    /*
-    distro_OS();
-    kernel part was already done so no need to make extra function nor assign it to a struct
-    uname(&info);
-    printf("OS Kernel: %s\n", info.sysname);
-    uptime();
-
-    hw.motherboard();
-    hw.cpu();
-    printf("ram: %.1fGiB\n", hw.ram());
-    hw.gpu();
-    hw.disk();
-    */
 
     return 0;
 }
