@@ -334,6 +334,18 @@ void uptime(char *out, size_t size)
     }
 }
 
+void shell(char *out, size_t size)
+{
+    char *path = getenv("SHELL");
+    if (path == NULL) {
+        snprintf(out, size, "ERROR: failed to identify shell");
+    } else {
+        const char *slash = strrchr(path, '/');
+        const char *shell_name = (slash != NULL) ? slash + 1 : path;
+        snprintf(out,size,"SHELL: %s", shell_name);
+    }
+}
+
 const char *logo(void) {
     #ifdef __linux__
         return
@@ -405,6 +417,7 @@ int main(void) {
     snprintf(lines[info_count++], 256, "---------------------------------------");
     distro_OS(lines[info_count++], 256);
     snprintf(lines[info_count++], 256, "OS Kernel: %s | %s", info.sysname, info.release);
+    shell(lines[info_count++], 256);
     uptime(lines[info_count++], 256);
     motherboard(lines[info_count++], 256);
     print_cpu(lines[info_count++], 256);
