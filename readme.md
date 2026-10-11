@@ -30,6 +30,8 @@ To learn file handling and like 90% of header files I used to make it(for exampl
 
 Used claude help to write multi GPU detection, not a single line was pasted, the ones that were copied were pure hand copy and altered by me
 
+help to make install.sh and Makefile
+
 ## How to run
 
 Linux only for now. Only tested on Ubuntu 26.04 LTS.
