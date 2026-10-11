@@ -6,6 +6,7 @@
 #include <dirent.h>
 #include <sys/statvfs.h>
 
+#define MAX_LINES 16
 // NOTICE
 // if i comment obvious stuff is bc im new
 // to this programming stuff so i need guidance on code to
@@ -157,7 +158,7 @@ void ram(char *out, size_t size)
                     used_ram = strtod(avail_mem, NULL) / 1024.0 / 1024.0;
                     used_ram = total_ram - used_ram;
 
-                    snprintf(out, size, "Ram: %.1f GiB | %.1f GiB", used_ram, total_ram);
+                    snprintf(out, size, "RAM: %.1f GiB | %.1f GiB", used_ram, total_ram);
 
                     break;
                 }
@@ -183,23 +184,132 @@ void disk_space(char *out, size_t size) {
     }
 }
 
-void gpu_detect(char *out, size_t size)
+long read_pci_hex(const char *dev, const char *file_name)
 {
-    FILE *file = popen("lspci | grep -E 'VGA|3D' | sed 's/.*: //'", "r");
+    char path[512];
+    snprintf(path, sizeof(path), "/sys/bus/pci/devices/%s/%s", dev, file_name);
 
-    if (file != NULL ) {
-        char gpu[256];
-        snprintf(out, size, "GPU: unknown");
-
-        if (fgets(gpu, sizeof(gpu), file) != NULL) {
-            // strips new char from lspci
-            gpu[strcspn(gpu, "\n")] = '\0';
-            snprintf(out, size, "GPU: %s", gpu);
-        }
-    pclose(file);
-    } else {
-        snprintf(out, size, "ERROR: couldn't identify GPU");
+    FILE *file = fopen(path, "r");
+    if (file == NULL) {
+        return -1;
     }
+
+    char read[64];
+    long value = -1;
+
+    if (fgets(read, sizeof(read), file) != NULL) {
+        value = strtol(read, NULL, 16); // base 16 accepts the "0x" prefxi i think
+    }
+    fclose(file);
+    return value;
+}
+
+const char *vendor_name(long id)
+{
+    switch (id) {
+        case 0x10de: return "NVIDIA";
+        case 0x1002: return "AMD";
+        case 0x8086: return "Intel";
+        default: return "Unknown";
+    }
+}
+
+int gpu_model(long vendor, long device, char *out, size_t size)
+{
+    const char *paths[] = { "/usr/share/hwdata/pci.ids", "/usr/share/misc/pci.ids" };
+    FILE *file = NULL;
+
+    // try each known location until one opens
+    for (int i = 0; i < 2 && file == NULL; i++) {
+        file = fopen(paths[i], "r");
+    }
+    if (file == NULL) {
+        return 0;
+    }
+
+    char read[512];
+    int in_vendor = 0; // 1 when we are inside the vendor block
+    int found = 0;
+
+    while (!found && fgets(read, sizeof(read), file) != NULL) {
+        if (read[0] == '#' || read[0] == '\n') {
+            continue;
+        }
+
+        char *end;
+
+        if (read[0] != '\t') {
+            //vendor line:"10de  NVIDIA corporation"
+            // OMG this is so hard
+            if (in_vendor) {
+                break;
+            }
+
+            long id = strtol(read, &end, 16);
+            // 4 hex digits, so things like "C 03 ..." get ignored
+            in_vendor = (end - read == 4 && id == vendor);
+        } else if (in_vendor && read[1] != '\t') {
+            // device line: "<tab>1e81 TU104 [GeForce RTX 2080 SUPER]" 2 tabs means a subsystem line
+            long id = strtol(read + 1, &end, 16);
+
+            if (end - (read + 1) == 4 && id == device) {
+                while (*end == ' ') {end++;}
+                end[strcspn(end, "\n")] = '\0';
+                snprintf(out, size, "%s", end);
+                found = 1;
+            }
+        }
+    }
+    fclose(file);
+    return found;
+}
+
+// writes one line per GPU
+// never writes at past lines[max]
+// return the amount of lines it wrote
+int gpu_detect(char lines[][256], int start, int max)
+{
+    int count = 0;
+    DIR *dir = opendir("/sys/bus/pci/devices/");
+
+    if (dir != NULL) {
+        struct dirent *entry;
+
+        while (start + count < max && (entry = readdir(dir))!= NULL) {
+            long class_code = read_pci_hex(entry -> d_name, "class");
+
+            // top byte 0x03 is the display controller (VGA, 3D, etc)
+            if(class_code < 0 || (class_code >> 16) != 3) {
+                continue;
+            }
+
+            long vendor = read_pci_hex(entry -> d_name, "vendor");
+            long device = read_pci_hex(entry -> d_name, "device");
+
+            if (vendor < 0 || device < 0) {
+                continue;
+            }
+
+            char model[128];
+            if (gpu_model(vendor, device, model, sizeof(model))) {
+                snprintf(lines[start + count], 256, "GPU: %s %s", vendor_name(vendor), model);
+            } else {
+                // no pci.ids on this machine, fall back to the raw ids
+                snprintf(lines[start + count], 256, "GPU: %s (%04lx:%04lx)",
+                         vendor_name(vendor), vendor, device);
+            }
+
+            count++;
+        }
+        closedir(dir);
+    }
+
+    // in case nothing found or sys not readble, still fill a line
+    if (count == 0) {
+        snprintf(lines[start], 256, "GPU: unknown");
+        count = 1;
+    }
+    return count;
 }
 
 void uptime(char *out, size_t size)
@@ -288,7 +398,7 @@ int main(void) {
     uname(&info);
 
     // each row is one line of text, filled at runtime instead of hardcoded
-    char lines[10][256];
+    char lines[MAX_LINES][256] = {0};
     int info_count = 0;
 
     snprintf(lines[info_count++], 256, "%s@%s", get_user(), info.nodename);
@@ -299,7 +409,7 @@ int main(void) {
     motherboard(lines[info_count++], 256);
     print_cpu(lines[info_count++], 256);
     ram(lines[info_count++], 256);
-    gpu_detect(lines[info_count++], 256);
+    info_count += gpu_detect(lines, info_count, MAX_LINES - 1);
     disk_space(lines[info_count++], 256);
 
     int row = 0;
