@@ -117,15 +117,17 @@ void print_cpu(char *out, size_t size) {
     snprintf(out, size, "CPU: %s (%ld threads) %.2f GHz",cpu_model, threads, clock);
 }
 
-double ram()
+void ram(char *out, size_t size)
 {
     FILE *file = fopen("/proc/meminfo", "r");
-    double ram = 0;
+    double total_ram = 0;
+    double used_ram = 0;
 
     if (file == NULL) {
-        printf("ERROR: couldn't read filee");
+        snprintf(out, size, "ERROR: couldn't read file");
     } else {
         char read[256];
+        snprintf(out, size, "RAM: unknown");
 
         while (fgets(read, sizeof(read), file) != NULL) {
             if (strncmp(read, "MemTotal", 8) == 0) {
@@ -137,7 +139,25 @@ double ram()
                     while(*max_mem == ' ' || *max_mem == '\t') { max_mem++; }
                     max_mem[strcspn(max_mem, "\n")] = '\0';
 
-                    ram = strtod(max_mem, NULL) / 1024.0 / 1024.0;
+                    total_ram = strtod(max_mem, NULL) / 1024.0 / 1024.0;
+
+                }
+            }
+
+            if (strncmp(read, "MemAvailable", 12) == 0) {
+                char *colon = strchr(read, ':');
+
+                if (colon) {
+                    char *avail_mem = colon + 1;
+
+                    while(*avail_mem == ' ' || *avail_mem == '\t') { avail_mem++; }
+
+                    avail_mem[strcspn(avail_mem, "\n")] = '\0';
+
+                    used_ram = strtod(avail_mem, NULL) / 1024.0 / 1024.0;
+                    used_ram = total_ram - used_ram;
+
+                    snprintf(out, size, "Ram: %.1f GiB | %.1f GiB", used_ram, total_ram);
 
                     break;
                 }
@@ -145,8 +165,8 @@ double ram()
         }
         fclose(file);
     }
-    return ram;
 }
+
 
 void disk_space(char *out, size_t size) {
     struct statvfs ds;
@@ -274,11 +294,11 @@ int main(void) {
     snprintf(lines[info_count++], 256, "%s@%s", get_user(), info.nodename);
     snprintf(lines[info_count++], 256, "---------------------------------------");
     distro_OS(lines[info_count++], 256);
-    snprintf(lines[info_count++], 256, "OS Kernel: %s", info.sysname);
+    snprintf(lines[info_count++], 256, "OS Kernel: %s | %s", info.sysname, info.release);
     uptime(lines[info_count++], 256);
     motherboard(lines[info_count++], 256);
     print_cpu(lines[info_count++], 256);
-    snprintf(lines[info_count++], 256, "RAM: %.1f GiB", ram());
+    ram(lines[info_count++], 256);
     gpu_detect(lines[info_count++], 256);
     disk_space(lines[info_count++], 256);
 
