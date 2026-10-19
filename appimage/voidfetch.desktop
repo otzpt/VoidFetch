@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=VoidFetch
+Comment=Lightweight Linux system information tool
+Exec=voidfetch
+Icon=voidfetch
+Categories=System;
+Terminal=true

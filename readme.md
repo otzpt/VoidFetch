@@ -34,6 +34,8 @@ help to make install.sh and Makefile
 
 help to re-write release description
 
+help to build the AppImage: `appimage/` (AppRun, .desktop file, build.sh) and the release description section about it. `main.c` was not changed. The icon is a plain placeholder square generated with a short Python script
+
 ## How to run
 
 Linux only for now. Only tested on Ubuntu 26.04 LTS.
