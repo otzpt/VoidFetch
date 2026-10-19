@@ -32,6 +32,8 @@ Used claude help to write multi GPU detection, not a single line was pasted, the
 
 help to make install.sh and Makefile
 
+help to re-write release description
+
 ## How to run
 
 Linux only for now. Only tested on Ubuntu 26.04 LTS.
@@ -91,8 +93,6 @@ BTW these limitations apart from the test one are supposed to disappear so pls h
 ## Responsibility
 
 I'm not responsible for anything that happens to your system
-
-## License
 
 ## License
 
